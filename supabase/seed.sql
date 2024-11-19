@@ -1,0 +1,1 @@
+-- Initial schema setup, no data needed yet
