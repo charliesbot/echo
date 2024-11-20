@@ -1,12 +1,16 @@
 -- Create enum for supported services
 create type public.social_service as enum ('bluesky', 'mastodon', 'threads');
 create type public.crosspost_status as enum ('pending', 'completed', 'failed');
+create type public.tweet_type as enum ('tweet', 'replied_to', 'quoted', 'retweeted');
 
--- 1. Single user table (will only have one record)
+-- 1. User table 
 create table if not exists public.users (
-    twitter_id text primary key,
+    id text primary key,
+    service public.social_service not null,
     name text not null,
     username text not null,
+    access_jwt TEXT NOT NULL,
+    refresh_jwt TEXT,
     created_at timestamptz default now(),
     updated_at timestamptz default now()
 );
@@ -17,6 +21,7 @@ create table if not exists public.tweets (
     tweet_text text not null,
     tweet_created_at timestamptz not null,
     referenced_tweet_id text,    -- Can be null or reference another tweet
+    tweet_type public.tweet_type default 'tweet',
     created_at timestamptz default now()
 );
 
@@ -34,12 +39,13 @@ create table if not exists public.tweet_media (
 
 -- 4. Cross-posting status and history
 create table if not exists public.crosspost (
-    id bigint generated always as identity primary key,
+    id text primary key, -- CID in Bluesky
     tweet_id text references public.tweets(tweet_id) ON DELETE CASCADE,
     service public.social_service not null,
     status public.crosspost_status not null default 'pending',
-    platform_id text,
-    platform_url text,
+    uri text,         -- Platform-specific URI (e.g., at:// for Bluesky, status URL for Mastodon)
+    parent_cid text,  -- CID of the parent post in Bluesky, used for threads
+    root_cid text,    -- CID of the root post in Bluesky, used for threads  
     attempt_count int default 0,
     last_attempt_at timestamptz,
     error_message text,
@@ -59,3 +65,7 @@ create table if not exists public.sync_state (
     completed_at timestamptz,
     created_at timestamptz default now()
 );
+
+create index if not exists idx_tweets_referenced on public.tweets(referenced_tweet_id) where referenced_tweet_id is not null;
+create index if not exists idx_tweets_created on public.tweets(tweet_created_at);
+create index if not exists idx_crosspost_status on public.crosspost(status) where status = 'pending';
