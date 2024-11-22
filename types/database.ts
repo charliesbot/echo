@@ -39,8 +39,9 @@ export type Database = {
           attempt_count: number | null
           completed_at: string | null
           created_at: string | null
+          crosspost_id: string | null
           error_message: string | null
-          id: string
+          id: number
           last_attempt_at: string | null
           parent_cid: string | null
           root_cid: string | null
@@ -53,8 +54,9 @@ export type Database = {
           attempt_count?: number | null
           completed_at?: string | null
           created_at?: string | null
+          crosspost_id?: string | null
           error_message?: string | null
-          id: string
+          id?: never
           last_attempt_at?: string | null
           parent_cid?: string | null
           root_cid?: string | null
@@ -67,8 +69,9 @@ export type Database = {
           attempt_count?: number | null
           completed_at?: string | null
           created_at?: string | null
+          crosspost_id?: string | null
           error_message?: string | null
-          id?: string
+          id?: never
           last_attempt_at?: string | null
           parent_cid?: string | null
           root_cid?: string | null

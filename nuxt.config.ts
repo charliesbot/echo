@@ -14,4 +14,8 @@ export default defineNuxtConfig({
   },
 
   modules: ["@nuxtjs/supabase"],
+  supabase: {
+    // This will disable the default redirect
+    redirect: false,
+  },
 });

@@ -6,3 +6,4 @@
 ## Local Development
 
 - npx supabase start
+- npx nuxi dev --dotenv .env.local

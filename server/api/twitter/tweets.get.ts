@@ -1,7 +1,7 @@
 import { TweetResponse } from "~/types/twitter";
 import { serverSupabaseClient } from "#supabase/server";
-import { Database, Enums } from "~/types/database";
-import { ToolsOzoneCommunicationUpdateTemplate } from "@atproto/api";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "~/types/database";
 
 const mock: TweetResponse = {
   data: [
@@ -378,15 +378,30 @@ const mock: TweetResponse = {
   },
 };
 
+async function getPendingTweetsFromDatabase(client: SupabaseClient<Database>) {
+  return client.from("tweets");
+}
+
 export default defineEventHandler(async (event) => {
   const response = mock;
-  //   const client = await serverSupabaseClient<Database>(event);
+  const client = await serverSupabaseClient<Database>(event);
 
   const tweets: Database["public"]["Tables"]["tweets"]["Insert"][] = [];
   const mediaMap: Record<
     string,
     Database["public"]["Tables"]["tweet_media"]["Insert"]
   > = {};
+
+  const { data: lastSync, error: syncError } = await client
+    .from("sync_state")
+    .select("last_tweet_id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (lastSync?.last_tweet_id == mock.meta.newest_id) {
+    return await $fetch("/api/echo/crossposts");
+  }
 
   for (const media of response.includes.media) {
     // Bluesky does not support videos (yet)
@@ -416,6 +431,10 @@ export default defineEventHandler(async (event) => {
       continue;
     }
 
+    if (maybeMedia && mediaMap[maybeMedia]) {
+      mediaMap[maybeMedia].tweet_id = tweet.id;
+    }
+
     tweets.push({
       tweet_id: tweet.id,
       tweet_text: tweet.text,
@@ -426,20 +445,35 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  //   const tweetsInsert = await client.from("tweets").insert(tweets);
-  // const mediaInsert = await client.from("tweet_media").insert({
-  //   media_key: "",
-  //   type: "",
-  // });
-  //   const syncStateInsert = await client.from("sync_state").insert({
-  //     last_tweet_id: tweets[0].tweet_id,
-  //     tweets_synced: tweets.length,
-  //   });
+  // In the future, we could have a map that will create an entry per service.
+  // Eg: "bluesky", "mastodon", "threads"
+  const initialCrossposts: Database["public"]["Tables"]["crosspost"]["Insert"][] =
+    tweets.map((tweet) => ({
+      tweet_id: tweet.tweet_id,
+      service: "bluesky",
+      status: "pending",
+      attempt_count: 0,
+    }));
 
-  // store media
+  await client.from("tweets").upsert(tweets, {
+    onConflict: "tweet_id",
+    ignoreDuplicates: true,
+  });
 
-  return {
-    tweets,
-    media: Object.values(mediaMap),
-  };
+  await client.from("tweet_media").upsert(Object.values(mediaMap), {
+    onConflict: "id",
+    ignoreDuplicates: true,
+  });
+
+  await client.from("crosspost").upsert(initialCrossposts, {
+    onConflict: "id",
+    ignoreDuplicates: true,
+  });
+
+  await client.from("sync_state").insert({
+    last_tweet_id: response.meta.newest_id,
+    tweets_synced: tweets.length,
+  });
+
+  return await $fetch("/api/echo/crossposts");
 });

@@ -39,11 +39,12 @@ create table if not exists public.tweet_media (
 
 -- 4. Cross-posting status and history
 create table if not exists public.crosspost (
-    id text primary key, -- CID in Bluesky
+    id bigint generated always as identity primary key,
     tweet_id text references public.tweets(tweet_id) ON DELETE CASCADE,
     service public.social_service not null,
     status public.crosspost_status not null default 'pending',
     uri text,         -- Platform-specific URI (e.g., at:// for Bluesky, status URL for Mastodon)
+    crosspost_id text, -- When a crosspost is completed, the service will return an id. CID in Bluesky.
     parent_cid text,  -- CID of the parent post in Bluesky, used for threads
     root_cid text,    -- CID of the root post in Bluesky, used for threads  
     attempt_count int default 0,
