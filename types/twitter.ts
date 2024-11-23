@@ -10,6 +10,11 @@ export type TweetResponse = {
 export type Tweet = {
   id: string;
   text: string;
+  // if the tweet is long, the text will be truncated
+  // and this field will be available.
+  note_tweet?: {
+    text: string;
+  };
   created_at: string;
   edit_history_tweet_ids?: string[];
   attachments?: {
